@@ -23,4 +23,7 @@ qemu-system-x86_64 \
     -device nec-usb-xhci,id=xhci \
     -device usb-mouse -device usb-kbd \
     -monitor stdio \
+    -d int,cpu_reset \
+    -D qemu_debug.log \
+    --no-reboot \
     $QEMU_OPTS

@@ -1,3 +1,4 @@
 /target
 disk.img
 Cargo.lock
+qemu_debug.log

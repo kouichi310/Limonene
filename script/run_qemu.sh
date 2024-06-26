@@ -2,7 +2,7 @@
 
 if [ $# -lt 1 ]
 then
-    cargo build
+    cargo +nightly build
     EFI_FILE=target/x86_64-unknown-uefi/debug/Limonene.efi
 else
     EFI_FILE=$1
