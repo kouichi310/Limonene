@@ -2,4 +2,4 @@
 disk.img
 Cargo.lock
 qemu_debug.log
-*.fd
+script/*.fd
