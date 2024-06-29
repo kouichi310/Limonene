@@ -1,8 +1,8 @@
 use crate::uefi::{EfiBootServices, EfiMemoryType, EfiSimpleTextOutputProtocol};
 
 use core::alloc::{GlobalAlloc, Layout};
-use core::ptr::NonNull;
 use core::panic;
+use core::ptr::NonNull;
 use utf16_literal::utf16;
 
 pub struct Allocator;
@@ -24,17 +24,24 @@ unsafe impl GlobalAlloc for Allocator {
         let align = layout.align();
 
         if align > 8 {
-            COUT.unwrap().as_ref().output_string(utf16!("align g8\0").as_ptr());
+            COUT.unwrap()
+                .as_ref()
+                .output_string(utf16!("align g8\0").as_ptr());
             panic!()
         } else {
-            let res = EFI_BOOT_SERVICES.unwrap().as_ref().allocate_pool(memory_type, size);
+            let res = EFI_BOOT_SERVICES
+                .unwrap()
+                .as_ref()
+                .allocate_pool(memory_type, size);
 
             res.unwrap()
         }
     }
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         if layout.align() > 8 {
-            COUT.unwrap().as_ref().output_string(utf16!("delloc\0").as_ptr());
+            COUT.unwrap()
+                .as_ref()
+                .output_string(utf16!("delloc\0").as_ptr());
             panic!()
         } else {
             let _ = EFI_BOOT_SERVICES.unwrap().as_ref().free_pool(ptr);
@@ -47,5 +54,8 @@ static ALLOCATOR: Allocator = Allocator;
 
 #[alloc_error_handler]
 fn out_of_memory(layout: ::core::alloc::Layout) -> ! {
-    panic!("Ran out of free memory while trying to allocate {:#?}", layout);
+    panic!(
+        "Ran out of free memory while trying to allocate {:#?}",
+        layout
+    );
 }

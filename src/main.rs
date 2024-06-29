@@ -5,16 +5,15 @@
 #![no_main]
 #![feature(alloc_error_handler)]
 
-
 extern crate alloc;
+mod console;
 mod uefi;
 mod uefi_alloc;
-mod console;
 
-use core::panic::PanicInfo;
 use alloc::format;
-use uefi::*;
 use console::*;
+use core::panic::PanicInfo;
+use uefi::*;
 
 fn get_memory_map_unicode(memory_type_number: u32) -> &'static str {
     match memory_type_number {
@@ -70,14 +69,22 @@ fn get_memory_map_unicode(memory_type_number: u32) -> &'static str {
 //     EfiStatus::Success
 // }
 
-fn save_memory_map(map: &[EfiMemoryDescriptor], file: &EfiFileProtocol, descriptor_size: usize, map_size: usize) -> EfiStatus {
+fn save_memory_map(
+    map: &[EfiMemoryDescriptor],
+    file: &EfiFileProtocol,
+    descriptor_size: usize,
+    map_size: usize,
+) -> EfiStatus {
     let header = "Index,\tType,\tType(name),\tPhysicalStart,\tNumberOfPages,\tAttribute\n";
     let len = header.len();
 
     let written_size = file.write(len, header).unwrap();
 
     if written_size != len {
-        panic!("Faild to write completely. len:{} done: {}", len, written_size);
+        panic!(
+            "Faild to write completely. len:{} done: {}",
+            len, written_size
+        );
     }
 
     let mut index = 0;
@@ -85,7 +92,9 @@ fn save_memory_map(map: &[EfiMemoryDescriptor], file: &EfiFileProtocol, descript
 
     while offset < map_size {
         let memory_descriptor = unsafe {
-            (map.as_ptr().add(offset) as *const EfiMemoryDescriptor).as_ref().unwrap()
+            (map.as_ptr().add(offset) as *const EfiMemoryDescriptor)
+                .as_ref()
+                .unwrap()
         };
         let mem_region_info = format!(
             "{:},\t0x{:x},\t{:},\t0x{:x},\t0x{:x},\t0x{:x}\n",
@@ -163,7 +172,7 @@ pub extern "C" fn efi_main(_image_handle: EfiHandle, system_table: &EfiSystemTab
 
     println!("pass3");
 
-    loop{}
+    loop {}
 
     // uefi::EfiStatus::Success
 }

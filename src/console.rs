@@ -1,9 +1,7 @@
 use crate::EfiSimpleTextOutputProtocol;
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::{
-    fmt::{self, Write},
-};
+use core::fmt::{self, Write};
 
 #[macro_export]
 macro_rules! print {
@@ -26,7 +24,10 @@ impl Write for Console {
         let _full_text = _text + "\0";
         let _u16_str: Vec<u16> = _full_text.encode_utf16().into_iter().collect();
         unsafe {
-            self.protocol.as_ref().unwrap().output_string(_u16_str.as_ptr());
+            self.protocol
+                .as_ref()
+                .unwrap()
+                .output_string(_u16_str.as_ptr());
         }
         Ok(())
     }
@@ -42,6 +43,8 @@ pub struct Console {
 pub fn init(simple_text_output_protocol: &mut EfiSimpleTextOutputProtocol) {
     simple_text_output_protocol.reset(false);
     unsafe {
-        CONSOLE = Some(Console {protocol: simple_text_output_protocol});
+        CONSOLE = Some(Console {
+            protocol: simple_text_output_protocol,
+        });
     }
 }
