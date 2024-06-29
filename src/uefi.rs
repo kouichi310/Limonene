@@ -114,6 +114,7 @@ pub enum EfiFileAttribute {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct EfiGuid {
     data_1: u32,
     data_2: u16,
@@ -171,6 +172,7 @@ pub struct EfiBootServices {
     reinstall_protocol_interface: NotImplemented,
     uninstall_protocol_interface: NotImplemented,
     handle_protocol: NotImplemented,
+    reserved: NotImplemented,
     register_protocol_notify: NotImplemented,
     locate_handle: NotImplemented,
     locate_device_path: NotImplemented,
@@ -185,10 +187,12 @@ pub struct EfiBootServices {
     get_next_monotonic_count: NotImplemented,
     stall: NotImplemented,
     set_watchdog_timer: NotImplemented,
+    connect_controller: NotImplemented,
+    disconnect_controller: NotImplemented,
     // open and close protocol services
-    open_protocol: fn(
+    open_protocol: extern "efiapi" fn(
         handle: EfiHandle,
-        protocl: &EfiGuid,
+        protocol: &EfiGuid,
         interface: &mut *mut c_void,
         agent_handle: EfiHandle,
         controller_handle: EfiHandle,
@@ -214,7 +218,6 @@ pub struct EfiBootServices {
     create_event_ex: NotImplemented,
 }
 
-
 impl EfiBootServices {
     pub fn get_memory_map(
         &self,
@@ -234,6 +237,7 @@ impl EfiBootServices {
         );
 
         if _res == EfiStatus::Success {
+            println!("[get-memory-map]get memory map done!");
             Ok((
                 memory_map_size,
                 map_key,
@@ -248,7 +252,7 @@ impl EfiBootServices {
     pub unsafe fn open_protocol(
         &self,
         handle: EfiHandle,
-        protocl: &EfiGuid,
+        protocol: &EfiGuid,
         agent_handle: EfiHandle,
         controller_handle: EfiHandle,
         attributes: u32,
@@ -258,7 +262,7 @@ impl EfiBootServices {
 
         let _res = (self.open_protocol)(
             handle,
-            protocl,
+            protocol,
             interface_ptr,
             agent_handle,
             controller_handle,
@@ -269,6 +273,7 @@ impl EfiBootServices {
             if interface_ptr.is_null() {
                 println!("RETURN NULL")
             }
+            println!("[open-protocol] open protocol is done");
             Ok(interface_ptr.as_ref().unwrap())
         } else {
             Err(_res)

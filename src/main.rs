@@ -12,7 +12,7 @@ mod uefi_alloc;
 
 use alloc::format;
 use console::*;
-use core::panic::PanicInfo;
+use core::{panic::PanicInfo, ptr::null};
 use uefi::*;
 
 fn get_memory_map_unicode(memory_type_number: u32) -> &'static str {
@@ -38,39 +38,49 @@ fn get_memory_map_unicode(memory_type_number: u32) -> &'static str {
     }
 }
 
-// fn open_root_dir(
-//     image_handle: EfiHandle,
-//     root: &mut *mut EfiFileProtocol,
-//     bs: &EfiBootServices<'static>,
-// ) -> EfiStatus {
-//     let mut loaded_image: *mut EfiLoadedImageProtocol = null_mut();
-//     let mut fs: *mut EfiSimpleFileSystemProtocol = null_mut();
+fn open_root_dir(
+    image_handle: EfiHandle,
+    bs: &EfiBootServices,
+) -> Result<&EfiFileProtocol, EfiStatus> {
+    unsafe {
+        let _loaded_image = bs
+            .open_protocol(
+                image_handle,
+                &EFI_LOADED_IMAGE_PROTOCOL,
+                image_handle,
+                null(),
+                EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL,
+            )
+            .unwrap();
 
-//     bs.open_protocol(
-//         image_handle,
-//         &EFI_LOADED_IMAGE_PROTOCOL,
-//         (&mut loaded_image as *mut *mut EfiLoadedImageProtocol) as *mut *mut c_void,
-//         image_handle,
-//         null(),
-//         EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL,
-//     );
+        let loaded_image = ((_loaded_image as *const _) as *const EfiLoadedImageProtocol)
+            .as_ref()
+            .unwrap();
 
-//     bs.open_protocol(
-//         unsafe{(*loaded_image).device_handle},
-//         &EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID,
-//         (&mut fs as *mut *mut EfiSimpleFileSystemProtocol) as *mut *mut c_void,
-//         image_handle,
-//         null(),
-//         EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL
-//     );
+        println!("[open-root-dir] open image done!");
 
-//     unsafe{(*fs).open_volume(root)};
+        let _fs = bs
+            .open_protocol(
+                loaded_image.device_handle,
+                &EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID,
+                image_handle,
+                null(),
+                EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL,
+            )
+            .unwrap();
 
-//     EfiStatus::Success
-// }
+        let fs = ((_fs as *const _) as *const EfiSimpleFileSystemProtocol)
+            .as_ref()
+            .unwrap();
+
+        println!("[open-root-dir] open file system done!");
+
+        fs.open_volume()
+    }
+}
 
 fn save_memory_map(
-    map: &[EfiMemoryDescriptor],
+    map: &[u8],
     file: &EfiFileProtocol,
     descriptor_size: usize,
     map_size: usize,
@@ -130,51 +140,33 @@ struct MemoryMap<'a> {
 // UEFIは仕様書でC言語の呼び出し規約を使わないとらしい
 //　呼び出し規約は、ABIの一部でサブルーチン呼び出し時とかに、何をどうスタックに格納するかとか書いてあるとか
 #[no_mangle]
-pub extern "C" fn efi_main(_image_handle: EfiHandle, system_table: &EfiSystemTable) -> EfiStatus {
+pub extern "C" fn efi_main(image_handle: EfiHandle, system_table: &EfiSystemTable) -> EfiStatus {
     uefi_alloc::init(system_table.boot_services(), system_table.con_out());
     console::init(system_table.con_out());
 
     println!("Hello Limonene");
 
-    // let mut buffer: [u8; 4096 * 4] = [0; 4096 * 4];
-    // let mut memory_map = MemoryMap {
-    //     buffer_size: 4096 * 4,
-    //     buffer: &mut buffer,
-    //     map_size: 0,
-    //     map_key: 0,
-    //     descriptor_size: 0,
-    //     descriptor_version: 0,
-    // };
+    let mut memory_map: [u8; 4096] = [0; 4096];
 
-    // memory_map.map_size = memory_map.buffer_size;
-    // system_table.boot_services().get_memory_map(
-    //     &mut memory_map.map_size,
-    //     &mut memory_map.buffer,
-    //     &mut memory_map.map_key,
-    //     &mut memory_map.descriptor_size,
-    //     &mut memory_map.descriptor_version,
-    // );
+    let (map_size, _, descriptor_size, _) = system_table
+        .boot_services()
+        .get_memory_map(&mut memory_map)
+        .unwrap();
 
-    println!("pass1");
+    let efi_file_protocol = open_root_dir(image_handle, system_table.boot_services()).unwrap();
 
-    // let mut root_dir: *mut EfiFileProtocol = ptr::null_mut();
-    // let efi_file_proto = open_root_dir(_image_handle, system_table.boot_services()).unwrap();
-
-    println!("pass2");
-
-    // let opened_handle = efi_file_proto.open(
-    //     "\\memmap",
-    //     EfiFileOpenMode::CreateReadWrite,
-    //     EfiFileAttribute::None,
-    // ).unwrap();
-
-    //save_memory_map(&memory_map, &opened_handle, descriptor_size, map_size);
-
-    println!("pass3");
-
+    let opened_handle = efi_file_protocol
+        .open(
+            "\\memmap",
+            EfiFileOpenMode::CreateReadWrite,
+            EfiFileAttribute::None,
+        )
+        .unwrap();
+    save_memory_map(&memory_map, &opened_handle, descriptor_size, map_size);
+    if efi_file_protocol.close().unwrap() == EfiStatus::Success {
+        println!("file closed");
+    }
     loop {}
-
-    // uefi::EfiStatus::Success
 }
 
 #[panic_handler]
