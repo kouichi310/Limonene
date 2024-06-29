@@ -1,11 +1,46 @@
 use core::{ffi::c_void, ptr::{self, null_mut}};
-use alloc::{string::String, vec::Vec}; //将来的に消したいね
+use alloc::{string::String, vec::Vec};
+
+use crate::print;
+use crate::println; //将来的に消したいね
 
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 #[repr(C)]
 pub enum EfiStatus {
-    Success = 0,
+    Success,
+    LoadError,
+    InvalidParameter,
+    Unsupprted,
+    BadBufferSize,
+    BufferTooSmall,
+    NotReady,
+    DeviceError,
+    WriteProtected,
+    OutOfResources,
+    VolumeCorrupted,
+    VolumeFull,
+    NoMedia,
+    MediaChanged,
+    NotFound,
+    AccessDenied,
+    NoResponse,
+    NoMapping,
+    Timeout,
+    NotStarted,
+    AlreadyStarted,
+    Aborted,
+    IcmpError,
+    ProtocolError,
+    IncompatibleVersion,
+    SecurityViolation,
+    CrcError,
+    EndOfMedia,
+    EndOfFile = 31,
+    InvalidLanguage,
+    CompromisedData,
+    IpAddressConflict,
+    HttpError,
 }
 
 #[repr(C)]
@@ -113,15 +148,15 @@ pub struct EfiBootServices {
     restore_tpl: NotImplemented,
     allocate_page: NotImplemented,
     free_page: NotImplemented,
-    get_memory_map: fn(
-        memory_map_size:&mut usize,
-        memory_map: &mut [EfiMemoryDescriptor],
-        map_key: &mut usize,
-        descriptor_size: &mut usize,
-        descriptor_version: &mut u32,
+    get_memory_map: extern "efiapi" fn(
+        MemoryMapSize: &mut usize,
+        MemoryMap: *mut u8,
+        MapKey: &mut usize,
+        DescriptorSize: &mut usize,
+        DescriptoraVersion: &mut u32,
     ) -> EfiStatus,
-    allocate_pool: fn(pool_type: EfiMemoryType, size: usize, buffer: &mut *mut u8) -> EfiStatus,
-    free_pool: fn(address: *mut u8) -> EfiStatus,
+    allocate_pool: extern "efiapi" fn(pool_type: EfiMemoryType, size: usize, buffer: &mut *mut u8) -> EfiStatus,
+    free_pool: extern "efiapi" fn(address: *mut u8) -> EfiStatus,
     install_protocol_interface: NotImplemented,
     uninstall_protocol_interface: NotImplemented,
     reinstall_protocol_interface: NotImplemented,
@@ -131,7 +166,7 @@ pub struct EfiBootServices {
     handle_protocol: NotImplemented,
     locate_device_path: NotImplemented,
     open_protocol: fn(handle: EfiHandle, protocl: &EfiGuid, interface: &mut *mut c_void,agent_handle: EfiHandle, controller_handle: EfiHandle, attributes: u32) -> EfiStatus,
-    close_protocol: NotImplemented,
+    close_protocol: fn(handle: EfiHandle, protocol: *const EfiGuid, agent_handle: EfiHandle, controller_handle: EfiHandle) -> EfiStatus,
     open_protocol_information: NotImplemented,
     connect_controller: NotImplemented,
     disconnect_controller: NotImplemented,
@@ -156,31 +191,34 @@ pub struct EfiBootServices {
 }
 
 impl EfiBootServices {
-	pub fn get_memory_map(&self, memory_map: &mut [EfiMemoryDescriptor]) -> Result<(usize, usize, usize, u32), EfiStatus> {
-		let mut memory_map_size = memory_map.len() * core::mem::size_of::<EfiMemoryDescriptor>();
-		let mut map_key = 0;
-		let mut descriptor_size = 0;
-		let mut descriptor_version = 0;
+	pub fn get_memory_map(
+        &self,
+        memory_map_buffer: &mut [u8],
+    ) -> Result<(usize, usize, usize, u32), EfiStatus> {
+        let mut memory_map_size = core::mem::size_of::<u8>() * memory_map_buffer.len();
+        // let buffer_ptr = memory_map_buffer.as_mut_ptr();
+        let mut map_key = 0;
+        let mut descriptor_size = 0;
+        let mut descriptor_version = 0;
+        let _res = (self.get_memory_map)(
+            &mut memory_map_size,
+            memory_map_buffer.as_mut_ptr(),
+            &mut map_key,
+            &mut descriptor_size,
+            &mut descriptor_version,
+        );
 
-		let _res = (self.get_memory_map)(
-			&mut memory_map_size,
-			memory_map,
-			&mut map_key,
-			&mut descriptor_size,
-			&mut descriptor_version,
-		);
-
-		if _res == EfiStatus::Success {
-			Ok((
-				memory_map_size,
-				map_key,
-				descriptor_size,
-				descriptor_version,
-			))
-		} else {
-			Err(_res)
-		}
-	}
+        if _res == EfiStatus::Success {
+            Ok((
+                memory_map_size,
+                map_key,
+                descriptor_size,
+                descriptor_version,
+            ))
+        } else {
+            Err(_res)
+        }
+    }
 
     pub unsafe fn open_protocol(&self, handle: EfiHandle, protocl: &EfiGuid, agent_handle: EfiHandle, controller_handle: EfiHandle, attributes: u32) -> Result<&c_void, EfiStatus> {
         let mut _interface: *mut c_void = null_mut();
@@ -197,12 +235,22 @@ impl EfiBootServices {
 
         if _res == EfiStatus::Success {
             if interface_ptr.is_null() {
-                // !todo!("RETURN NULL")
+                println!("RETURN NULL")
             }
             Ok(interface_ptr.as_ref().unwrap())
         } else {
             Err(_res)
         }
+    }
+
+    pub fn close_protocol(
+        &self,
+        handle: EfiHandle,
+        protocol: *const EfiGuid,
+        agent_handle: EfiHandle,
+        controller_handle: EfiHandle,
+    ) -> EfiStatus {
+        (self.close_protocol)(handle, protocol, agent_handle, controller_handle)
     }
 
     pub fn allocate_pool(&self, pooltype: EfiMemoryType, size: usize) -> Result<*mut u8, ()> {
@@ -227,18 +275,18 @@ impl EfiBootServices {
 pub struct EfiConfigurationTable {}
 
 
-#[repr(C)]
+// #[repr(C)]
 pub struct EfiSimpleTextOutputProtocol {
-    reset: fn(This: &EfiSimpleTextOutputProtocol, ExtendedVerification: bool) -> EfiStatus,
-    output_string: fn(This: &EfiSimpleTextOutputProtocol, String: *const CHAR16) -> EfiStatus,
-    _unuse0: u64,
-    _unuse1: u64,
-    _unuse2: u64,
-    _unuse3: u64,
-    clear_screen: fn(This: &EfiSimpleTextOutputProtocol) -> EfiStatus,
-    _unuse5: u64,
-    _unuse6: u64,
-    _unuse7: u64,
+    reset: extern "efiapi" fn(This: &EfiSimpleTextOutputProtocol, ExtendedVerification: bool) -> EfiStatus,
+    output_string: extern "efiapi" fn(This: &EfiSimpleTextOutputProtocol, String: *const CHAR16) -> EfiStatus,
+    _unuse0: usize,
+    _unuse1: usize,
+    _unuse2: usize,
+    _unuse3: usize,
+    _unuse4: usize,
+    _unuse5: usize,
+    _unuse6: usize,
+    _unuse7: usize,
 }
 
 impl EfiSimpleTextOutputProtocol {
