@@ -139,17 +139,13 @@ pub const EFI_OPEN_PROTOCOL_BY_HANDLE_PROTOCOL: u32 = 0x00000001;
 
 #[repr(C)]
 pub struct EfiBootServices {
-    create_event: NotImplemented,
-    create_event_ex: NotImplemented,
-    close_event: NotImplemented,
-    signal_event: NotImplemented,
-    wait_for_event: NotImplemented,
-    check_event: NotImplemented,
-    set_timer: NotImplemented,
+    hdr: EfiTableHeader,
+    //task priority service
     raise_tpl: NotImplemented,
     restore_tpl: NotImplemented,
-    allocate_page: NotImplemented,
-    free_page: NotImplemented,
+    //memory service
+    allocate_pages: NotImplemented,
+    free_pages: NotImplemented,
     get_memory_map: extern "efiapi" fn(
         MemoryMapSize: &mut usize,
         MemoryMap: *mut u8,
@@ -163,14 +159,33 @@ pub struct EfiBootServices {
         buffer: &mut *mut u8,
     ) -> EfiStatus,
     free_pool: extern "efiapi" fn(address: *mut u8) -> EfiStatus,
+    //event & timer services
+    create_event: NotImplemented,
+    set_timer: NotImplemented,
+    wait_for_event: NotImplemented,
+    signal_event: NotImplemented,
+    close_event: NotImplemented,
+    check_event: NotImplemented,
+    // protocol handler services
     install_protocol_interface: NotImplemented,
-    uninstall_protocol_interface: NotImplemented,
     reinstall_protocol_interface: NotImplemented,
-    register_protocol_interface: NotImplemented,
+    uninstall_protocol_interface: NotImplemented,
+    handle_protocol: NotImplemented,
     register_protocol_notify: NotImplemented,
     locate_handle: NotImplemented,
-    handle_protocol: NotImplemented,
     locate_device_path: NotImplemented,
+    install_configuration_table: NotImplemented,
+    //image services
+    load_image: NotImplemented,
+    start_image: NotImplemented,
+    exit: NotImplemented,
+    unload_image: NotImplemented,
+    exit_boot_services: NotImplemented,
+    //miscellaneous services
+    get_next_monotonic_count: NotImplemented,
+    stall: NotImplemented,
+    set_watchdog_timer: NotImplemented,
+    // open and close protocol services
     open_protocol: fn(
         handle: EfiHandle,
         protocl: &EfiGuid,
@@ -186,27 +201,19 @@ pub struct EfiBootServices {
         controller_handle: EfiHandle,
     ) -> EfiStatus,
     open_protocol_information: NotImplemented,
-    connect_controller: NotImplemented,
-    disconnect_controller: NotImplemented,
+    // library services
     protocols_per_handle: NotImplemented,
     locate_handle_buffer: NotImplemented,
     locate_protocol: NotImplemented,
     install_multiple_protocol_interfaces: NotImplemented,
     uninstall_multiple_protocol_interfaces: NotImplemented,
-    load_image: NotImplemented,
-    start_image: NotImplemented,
-    unload_image: NotImplemented,
-    efi_image_entry_point: NotImplemented,
-    exit: NotImplemented,
-    exit_boot_services: NotImplemented,
-    set_watch_dog_timer: NotImplemented,
-    stall: NotImplemented,
+    //32-bit crc services
+    calculate_crc32: NotImplemented,
     copy_mem: NotImplemented,
     set_mem: NotImplemented,
-    get_next_monotonic_count: NotImplemented,
-    install_configuration_table: NotImplemented,
-    calculate_crc_32: NotImplemented,
+    create_event_ex: NotImplemented,
 }
+
 
 impl EfiBootServices {
     pub fn get_memory_map(
