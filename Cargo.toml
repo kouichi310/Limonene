@@ -1,16 +1,10 @@
-[package]
-name = "Limonene"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = ["bootloader", "kernel"]
 
-[dependencies]
-utf16_literal = "0.2.1"
+resolver = "2"
 
-# パニック時にunwindせずプログラムを終了させる
-# ビルドバージョンのプロファイル
 [profile.dev]
 panic = "abort"
 
-# リリースバージョンのプロファイル
 [profile.release]
 panic = "abort"
