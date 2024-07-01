@@ -121,7 +121,9 @@ fn save_memory_map(
         offset += descriptor_size;
     }
 
-    file.close().unwrap();
+    if file.close().unwrap() == EfiStatus::Success {
+        println!("[save-memory-map]file closed");
+    }
     EfiStatus::Success
 }
 
@@ -163,9 +165,17 @@ pub extern "C" fn efi_main(image_handle: EfiHandle, system_table: &EfiSystemTabl
         )
         .unwrap();
     save_memory_map(&memory_map, &opened_handle, descriptor_size, map_size);
-    if efi_file_protocol.close().unwrap() == EfiStatus::Success {
-        println!("file closed");
-    }
+
+    let opened_handle = efi_file_protocol
+        .open("\\kernel", EfiFileOpenMode::Read, EfiFileAttribute::None)
+        .unwrap();
+
+    let kernel_file_info = opened_handle.get_info("\\kernel").unwrap();
+    let kernel_file_size = kernel_file_info.size;
+
+    println!("Kernel size is {:}", kernel_file_size);
+    opened_handle.close().unwrap();
+
     loop {}
 }
 

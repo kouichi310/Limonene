@@ -1,4 +1,4 @@
-use alloc::{string::String, vec::Vec};
+use alloc::{boxed::Box, string::String, vec::Vec};
 use core::{
     ffi::c_void,
     ptr::{self, null_mut},
@@ -74,6 +74,34 @@ pub struct EfiMemoryDescriptor {
 }
 
 #[repr(C)]
+#[derive(Clone, Copy)]
+pub struct EfiTime {
+    year: u64,
+    month: u8,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+    _pad1: u8,
+    nanosecond: u32,
+    time_zone: i16,
+    daylight: u8,
+    _pad2: u8,
+}
+
+#[derive(Clone, Copy)]
+#[repr(C)]
+pub struct EfiFileInfo {
+    pub size: u64,
+    pub file_size: u64,
+    pub physical_size: u64,
+    pub create_time: EfiTime,
+    pub last_access_time: EfiTime,
+    pub modification_time: EfiTime,
+    pub attribute: u64,
+}
+
+#[repr(C)]
 pub enum EfiMemoryType {
     EfiReservedMemoryType,
     EfiLoaderCode,
@@ -132,6 +160,13 @@ pub const EFI_LOADED_IMAGE_PROTOCOL: EfiGuid = EfiGuid {
 pub const EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID: EfiGuid = EfiGuid {
     data_1: 0x0964e5b22,
     data_2: 0x6459,
+    data_3: 0x11d2,
+    data_4: [0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b],
+};
+
+pub const EFI_FILE_INFO_ID: EfiGuid = EfiGuid {
+    data_1: 0x09576e92,
+    data_2: 0x6d3f,
     data_3: 0x11d2,
     data_4: [0x8e, 0x39, 0x00, 0xa0, 0xc9, 0x69, 0x72, 0x3b],
 };
@@ -411,7 +446,7 @@ pub struct EfiFileProtocol {
         this: &EfiFileProtocol,
         informationType: &EfiGuid,
         bufferSize: &usize,
-        buffer: &c_void,
+        buffer: *mut c_void,
     ) -> EfiStatus,
     set_info: fn(
         this: &EfiFileProtocol,
@@ -456,6 +491,7 @@ impl EfiFileProtocol {
         );
 
         if _res == EfiStatus::Success {
+            println!("[efi-file-protocol] protocol open");
             unsafe { Ok(new_handle.as_ref().unwrap()) }
         } else {
             Err(_res)
@@ -477,6 +513,20 @@ impl EfiFileProtocol {
         let _res = (self.close)(self);
         if _res == EfiStatus::Success {
             Ok(_res)
+        } else {
+            Err(_res)
+        }
+    }
+
+    pub fn get_info(&self, file_name: &str) -> Result<EfiFileInfo, EfiStatus> {
+        let mut buffer: Box<[u8]> = Box::new([0; 1024]);
+        let buffer_ptr = buffer.as_mut_ptr() as *mut c_void;
+        let _res = (self.get_info)(self, &EFI_FILE_INFO_ID, &(buffer.len()), buffer_ptr);
+        if _res == EfiStatus::Success {
+            let file_info = unsafe {
+                (buffer.as_ptr() as *const EfiFileInfo).as_ref().unwrap()
+            };
+            Ok(*file_info)
         } else {
             Err(_res)
         }
